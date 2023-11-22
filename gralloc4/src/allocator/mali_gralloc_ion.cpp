@@ -60,6 +60,8 @@ static const char kDmabufVframeSecureHeapName[] = "vframe-secure";
 static const char kDmabufVstreamSecureHeapName[] = "vstream-secure";
 static const char kDmabufVscalerSecureHeapName[] = "vscaler-secure";
 static const char kDmabufFramebufferSecureHeapName[] = "framebuffer-secure";
+static const char kDmabufGcmaCameraHeapName[] = "gcma_camera";
+static const char kDmabufGcmaCameraUncachedHeapName[] = "gcma_camera-uncached";
 
 BufferAllocator& get_allocator() {
 		static BufferAllocator allocator;
@@ -84,7 +86,7 @@ std::string select_dmabuf_heap(uint64_t usage)
 		std::string   name;
 	};
 
-	static const std::array<HeapSpecifier, 6> exact_usage_heaps =
+	static const std::array<HeapSpecifier, 7> exact_usage_heaps =
 	{{
 		// Faceauth heaps
 		{ // isp_image_heap
@@ -114,9 +116,15 @@ std::string select_dmabuf_heap(uint64_t usage)
 			GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_FB,
 			find_first_available_heap({kDmabufFramebufferSecureHeapName, kDmabufVframeSecureHeapName})
 		},
+
+		{
+			GRALLOC_USAGE_PROTECTED | GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_RENDER |
+			GRALLOC_USAGE_HW_COMPOSER,
+			find_first_available_heap({kDmabufFramebufferSecureHeapName, kDmabufVframeSecureHeapName})
+		},
 	}};
 
-	static const std::array<HeapSpecifier, 6> inexact_usage_heaps =
+	static const std::array<HeapSpecifier, 8> inexact_usage_heaps =
 	{{
 		// If GPU, use vframe-secure
 		{
@@ -146,6 +154,18 @@ std::string select_dmabuf_heap(uint64_t usage)
 			kDmabufSensorDirectHeapName
 		},
 
+		// Camera GCMA heap
+		{
+			GRALLOC_USAGE_HW_CAMERA_WRITE,
+			find_first_available_heap({kDmabufGcmaCameraUncachedHeapName, kDmabufSystemUncachedHeapName})
+		},
+
+		// Camera GCMA heap
+		{
+			GRALLOC_USAGE_HW_CAMERA_READ,
+			find_first_available_heap({kDmabufGcmaCameraUncachedHeapName, kDmabufSystemUncachedHeapName})
+		},
+
 		// Catchall to system
 		{
 			0,
@@ -165,7 +185,10 @@ std::string select_dmabuf_heap(uint64_t usage)
 	{
 		if ((usage & heap.usage_bits) == heap.usage_bits)
 		{
-			if (heap.name == kDmabufSystemUncachedHeapName &&
+			if (heap.name == kDmabufGcmaCameraUncachedHeapName &&
+			    ((usage & GRALLOC_USAGE_SW_READ_MASK) == GRALLOC_USAGE_SW_READ_OFTEN))
+				return kDmabufGcmaCameraHeapName;
+			else if (heap.name == kDmabufSystemUncachedHeapName &&
 			    ((usage & GRALLOC_USAGE_SW_READ_MASK) == GRALLOC_USAGE_SW_READ_OFTEN))
 				return kDmabufSystemHeapName;
 
@@ -340,6 +363,7 @@ int mali_gralloc_ion_allocate(const gralloc_buffer_descriptor_t *descriptors,
                               uint32_t numDescriptors, buffer_handle_t *pHandle,
                               bool *shared_backend, int ion_fd)
 {
+	ATRACE_CALL();
 	GRALLOC_UNUSED(shared_backend);
 
 	unsigned int priv_heap_flag = 0;
@@ -403,6 +427,7 @@ int mali_gralloc_ion_allocate(const gralloc_buffer_descriptor_t *descriptors,
 	}
 
 #if defined(GRALLOC_INIT_AFBC) && (GRALLOC_INIT_AFBC == 1)
+	ATRACE_NAME("AFBC init block");
 	unsigned char *cpu_ptr = NULL;
 	for (i = 0; i < numDescriptors; i++)
 	{
@@ -414,34 +439,42 @@ int mali_gralloc_ion_allocate(const gralloc_buffer_descriptor_t *descriptors,
 		if ((bufDescriptor->alloc_format & MALI_GRALLOC_INTFMT_AFBCENABLE_MASK)
 			&& !(usage & GRALLOC_USAGE_PROTECTED))
 		{
-			/* TODO: only map for AFBC buffers */
-			cpu_ptr =
-			    (unsigned char *)mmap(NULL, bufDescriptor->alloc_sizes[0], PROT_READ | PROT_WRITE, MAP_SHARED, hnd->fds[0], 0);
-
-			if (MAP_FAILED == cpu_ptr)
 			{
-				MALI_GRALLOC_LOGE("mmap failed for fd ( %d )", hnd->fds[0]);
-				mali_gralloc_ion_free_internal(pHandle, numDescriptors);
-				return -1;
+				ATRACE_NAME("mmap");
+				/* TODO: only map for AFBC buffers */
+				cpu_ptr =
+				    (unsigned char *)mmap(NULL, bufDescriptor->alloc_sizes[0], PROT_READ | PROT_WRITE, MAP_SHARED, hnd->fds[0], 0);
+
+				if (MAP_FAILED == cpu_ptr)
+				{
+					MALI_GRALLOC_LOGE("mmap failed for fd ( %d )", hnd->fds[0]);
+					mali_gralloc_ion_free_internal(pHandle, numDescriptors);
+					return -1;
+				}
+
+				mali_gralloc_ion_sync_start(hnd, true, true);
 			}
 
-			mali_gralloc_ion_sync_start(hnd, true, true);
-
-			/* For separated plane YUV, there is a header to initialise per plane. */
-			const plane_info_t *plane_info = bufDescriptor->plane_info;
-			const bool is_multi_plane = hnd->is_multi_plane();
-			for (int i = 0; i < MAX_PLANES && (i == 0 || plane_info[i].byte_stride != 0); i++)
 			{
-				init_afbc(cpu_ptr + plane_info[i].offset,
-				          bufDescriptor->alloc_format,
-				          is_multi_plane,
-				          plane_info[i].alloc_width,
-				          plane_info[i].alloc_height);
+				ATRACE_NAME("data init");
+				/* For separated plane YUV, there is a header to initialise per plane. */
+				const plane_info_t *plane_info = bufDescriptor->plane_info;
+				const bool is_multi_plane = hnd->is_multi_plane();
+				for (int i = 0; i < MAX_PLANES && (i == 0 || plane_info[i].byte_stride != 0); i++)
+				{
+					init_afbc(cpu_ptr + plane_info[i].offset,
+					          bufDescriptor->alloc_format,
+					          is_multi_plane,
+					          plane_info[i].alloc_width,
+					          plane_info[i].alloc_height);
+				}
 			}
 
-			mali_gralloc_ion_sync_end(hnd, true, true);
-
-			munmap(cpu_ptr, bufDescriptor->alloc_sizes[0]);
+			{
+				ATRACE_NAME("munmap");
+				mali_gralloc_ion_sync_end(hnd, true, true);
+				munmap(cpu_ptr, bufDescriptor->alloc_sizes[0]);
+			}
 		}
 	}
 #endif
