@@ -1,0 +1,28 @@
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+cc_library_shared {
+    name: "libexynosutils",
+    defaults: [
+        "arm_gchips_defaults",
+    ],
+    header_libs: [
+        "device_kernel_headers",
+        "google_hal_headers",
+    ],
+    shared_libs: [
+        "libcutils",
+        "libhardware",
+        "liblog",
+        "libutils",
+    ],
+    soc_specific: true,
+    srcs: [
+        "Exynos_log.c",
+        "ExynosMutex.cpp",
+        "exynos_format_v4l2.c",
+    ],
+    export_include_dirs: ["."],
+}
