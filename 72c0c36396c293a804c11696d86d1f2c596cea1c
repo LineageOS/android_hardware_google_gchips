@@ -16,6 +16,24 @@
       "message": "Upstream is already working on this, better wait until those changes are merged",
       "revId": "72c0c36396c293a804c11696d86d1f2c596cea1c",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "9adeb494_a49838e3",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 29415
+      },
+      "writtenOn": "2024-10-21T09:16:51Z",
+      "side": 1,
+      "message": "Thanks, took a look and they got merged last month. Submitting those changes instead.",
+      "parentUuid": "0c4de095_7a9e45ff",
+      "revId": "72c0c36396c293a804c11696d86d1f2c596cea1c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
