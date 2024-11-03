@@ -16,6 +16,24 @@
       "message": "Just add an empty Android.mk. However in the long term this (and your device) needs to be guarded properly because Android.mk will be going away",
       "revId": "6fbddcaa8019882350f10e6517540c6018389aa1",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "2dcf03cb_83463b1b",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 10067
+      },
+      "writtenOn": "2024-11-03T20:51:52Z",
+      "side": 1,
+      "message": "shouldn\u0027t https://github.com/LineageOS/android_hardware_google_gchips/blob/lineage-22.0/videoapi/Android.mk be converted to Android.bp then?",
+      "parentUuid": "f2e0cee7_6310ec9a",
+      "revId": "6fbddcaa8019882350f10e6517540c6018389aa1",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
