@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f2e0cee7_6310ec9a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2024-11-03T20:49:45Z",
+      "side": 1,
+      "message": "Just add an empty Android.mk. However in the long term this (and your device) needs to be guarded properly because Android.mk will be going away",
+      "revId": "6fbddcaa8019882350f10e6517540c6018389aa1",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
